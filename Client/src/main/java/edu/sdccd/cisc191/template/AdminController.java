@@ -5,7 +5,7 @@ import javafx.util.Pair;
 import javafx.event.*;
 import java.io.PrintWriter;
 import java.util.*;
-
+import javafx.application.Platform;
 public class AdminController {
     private PrintWriter out; // Print writer to send commands to Server
     private RestaurantClient client; // Client call to interact with client
@@ -70,12 +70,14 @@ public class AdminController {
                     String response = client.readServerResponse();
 
                     // Update the UI based on the server response
-                    if (response.startsWith("ITEM_ADDED")) {
-                        DialogPromt.showAlert("Success", "Item added: " + itemName + " - $" + itemPrice);
-                        refreshMenuFromServer();
-                    } else if (response.startsWith("ERROR")) {
-                        DialogPromt.showAlert("Error", response);
-                    }
+                    Platform.runLater(() -> { // Change: Wraps this code in Platform.runLater
+                        if (response.startsWith("ITEM_ADDED")) {
+                            DialogPromt.showAlert("Success", "Item added: " + itemName + " - $" + itemPrice);
+                            refreshMenuFromServer();
+                        } else if (response.startsWith("ERROR")) {
+                            DialogPromt.showAlert("Error", response);
+                        }
+                    });
                 } catch (Exception e) {
                     // Handle communication errors by showing an alert
                     DialogPromt.showAlert("Error", "Failed to communicate with server.");
@@ -99,12 +101,14 @@ public class AdminController {
                         response = client.readServerResponse();
 
                         // Once we get the response, update the UI on the JavaFX Application Thread
-                        if (response.startsWith("ITEM_REMOVED")) {
-                            DialogPromt.showAlert("Success", "Item removed: " + itemName);
-                            refreshMenuFromServer();
-                        } else if (response.startsWith("ERROR")) {
-                            DialogPromt.showAlert("Error", response);
-                        }
+                        Platform.runLater(() -> { // Change: Wraps this code in Platform.runLater
+                            if (response.startsWith("ITEM_REMOVED")) {
+                                DialogPromt.showAlert("Success", "Item removed: " + itemName);
+                                refreshMenuFromServer();
+                            } else if (response.startsWith("ERROR")) {
+                                DialogPromt.showAlert("Error", response);
+                            }
+                        });
                     } catch (Exception e) {
                         // If there's an error, show an alert on the UI thread
                         DialogPromt.showAlert("Error", "Failed to communicate with server.");
@@ -127,12 +131,14 @@ public class AdminController {
                 out.println("ADMIN_MODE UPDATE " + itemName + " " + itemPrice);
                 response = client.readServerResponse();
 
-                if (response.startsWith("ITEM_UPDATED")) {
-                    DialogPromt.showAlert("Success", "Item updated: " + itemName);
-                    refreshMenuFromServer();
-                } else if (response.startsWith("ERROR")) {
-                    DialogPromt.showAlert("Error", response);
-                }
+                Platform.runLater(() -> { // Change: Wraps this code in Platform.runLater
+                    if (response.startsWith("ITEM_UPDATED")) {
+                        DialogPromt.showAlert("Success", "Item updated: " + itemName);
+                        refreshMenuFromServer();
+                    } else if (response.startsWith("ERROR")) {
+                        DialogPromt.showAlert("Error", response);
+                    }
+                });
             } catch (NumberFormatException e) {
                 // Handle invalid price input
                 DialogPromt.showAlert("Invalid Input", "Price must be a number.");
