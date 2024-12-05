@@ -2,6 +2,7 @@ package edu.sdccd.cisc191.template;
 
 import java.net.*;
 import java.io.*;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.*;
 
@@ -94,13 +95,27 @@ public class Server {
             String[] parts = command.split(" ");
             String action = parts[0];
 
+            String itemName = null;
+            String priceString = null;
+
+            if (parts.length >= 3) {
+                if(parts[0].equals("REMOVE")){ //REMOVE doesn't need a price
+                    itemName = String.join(" ", Arrays.copyOfRange(parts, 1, parts.length)); //no price so itemName is everything after action
+                }
+                else{
+                    itemName = String.join(" ", Arrays.copyOfRange(parts, 1, parts.length - 1)); //itemName is between action and price
+                    priceString = parts[parts.length - 1]; //price is always last
+                }
+            }
+            else{
+                itemName = parts[parts.length - 1]; //parts has 2 elements so itemName is just last element (after action)
+            }
+
             switch (action) {
                 case "ADD":
-                    if (parts.length >= 3) {
-                        String itemName = parts[1];
-                        double itemPrice;
+                    if (itemName != null && priceString != null) {
                         try {
-                            itemPrice = Double.parseDouble(parts[2]);
+                            double itemPrice = Double.parseDouble(priceString);
                             MenuUtils.addItem(itemName, itemPrice);
                             out.println("ITEM_ADDED: " + itemName);
                         } catch (NumberFormatException e) {
@@ -112,11 +127,10 @@ public class Server {
                     break;
 
                 case "REMOVE":
-                    if (parts.length == 2) {
-                        String itemName = parts[1];
+                    if (itemName != null) {
                         if (MenuUtils.itemExists(itemName)) {
                             MenuUtils.removeItem(itemName);
-                            out.println("ITEM_REMOVED:" + itemName);
+                            out.println("ITEM_REMOVED: " + itemName);
                         } else {
                             out.println("ERROR: Item '" + itemName + "' not found.");
                         }
@@ -126,13 +140,12 @@ public class Server {
                     break;
 
                 case "UPDATE":
-                    if (parts.length == 3) {
-                        String itemName = parts[1];
+                    if (itemName != null && priceString != null) {
                         try {
-                            double newPrice = Double.parseDouble(parts[2]);
+                            double newPrice = Double.parseDouble(priceString);
                             if (MenuUtils.itemExists(itemName)) {
                                 MenuUtils.addItem(itemName, newPrice); // Update item by adding it again
-                                out.println("ITEM_UPDATED:" + itemName);
+                                out.println("ITEM_UPDATED: " + itemName);
                             } else {
                                 out.println("ERROR: Item '" + itemName + "' not found.");
                             }
@@ -149,5 +162,8 @@ public class Server {
                     break;
             }
         }
+
+
+
     }
 }
