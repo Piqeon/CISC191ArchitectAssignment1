@@ -1,22 +1,43 @@
-package edu.sdccd.cisc191.template;
+import edu.sdccd.cisc191.template.MenuUtils;
+import edu.sdccd.cisc191.template.Item;
+import edu.sdccd.cisc191.template.Order;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.stereotype.Component;
 
 import java.net.*;
 import java.io.*;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
 
-public class Server {
+@SpringBootApplication
+public class Server implements CommandLineRunner {
+
     private ServerSocket serverSocket;
-    private static final int PORT = 8080;
+    private static final int PORT = 8081;
     private static ExecutorService pool = Executors.newFixedThreadPool(10);
 
+    private final Database database; // Dependency injected by Spring
+
     public static void main(String[] args) {
-        Server server = new Server();
-        server.startServer();
+        SpringApplication.run(Server.class, args); // Start Spring Boot application
+    }
+    @Autowired
+    public Server(Database database) {
+        this.database = database;
     }
 
-    private void startServer() {
+    @Override
+    public void run(String... args) throws Exception {
+        startServer();  // Start the server once Spring Boot has initialized
+    }
+
+    public void startServer() {
         try {
             serverSocket = new ServerSocket(PORT);
             System.out.println("Server started on port " + PORT);
@@ -48,7 +69,7 @@ public class Server {
         }
     }
 
-    private static class ClientHandler implements Runnable {
+    private class ClientHandler implements Runnable {
         private Socket clientSocket;
         private BufferedReader in;
         private PrintWriter out;
@@ -70,6 +91,8 @@ public class Server {
                     } else if (request.startsWith("ADMIN_MODE")) {
                         String command = request.substring("ADMIN_MODE".length()).trim();
                         handleAdminMode(command);
+                    } else if (request.startsWith("PLACE_ORDER")) {
+                        handleOrder();
                     }
                 }
             } catch (IOException e) {
@@ -91,24 +114,62 @@ public class Server {
             out.println("MENU_END");
         }
 
+        private void handleOrder() {
+            try {
+                String orderDetails = in.readLine();
+                if (orderDetails != null) {
+                    Order newOrder = parseOrderDetails(orderDetails);
+                    if (newOrder == null) {
+                        out.println("ERROR: Failed to parse order details.");
+                        return;
+                    }
+                    // Now you can safely call saveOrder on the database
+                    database.saveOrder(newOrder);
+                    out.println("ORDER_PLACED: " + newOrder.getId());
+                }
+            } catch (IOException e) {
+                out.println("ERROR: Unable to place order.");
+            }
+        }
+
+        private Order parseOrderDetails(String orderDetails) {
+            String[] parts = orderDetails.split(",", 2);
+            String customerName = parts[0];
+            String itemsString = parts[1];
+
+            List<Item> items = parseItems(itemsString);
+
+            return new Order(items, customerName);
+        }
+
+        private List<Item> parseItems(String itemsString) {
+            List<Item> items = new ArrayList<>();
+            String[] itemDetails = itemsString.split(",");
+            for (String itemDetail : itemDetails) {
+                String[] itemInfo = itemDetail.split(":");
+                String itemName = itemInfo[0];
+                int quantity = Integer.parseInt(itemInfo[1]);
+                double price = Double.parseDouble(itemInfo[2]);
+                items.add(new Item(itemName, quantity, price));
+            }
+            return items;
+        }
+
         private void handleAdminMode(String command) {
             String[] parts = command.split(" ");
             String action = parts[0];
-
             String itemName = null;
             String priceString = null;
 
             if (parts.length >= 3) {
-                if(parts[0].equals("REMOVE")){ //REMOVE doesn't need a price
-                    itemName = String.join(" ", Arrays.copyOfRange(parts, 1, parts.length)); //no price so itemName is everything after action
+                if (parts[0].equals("REMOVE")) {
+                    itemName = String.join(" ", Arrays.copyOfRange(parts, 1, parts.length));
+                } else {
+                    itemName = String.join(" ", Arrays.copyOfRange(parts, 1, parts.length - 1));
+                    priceString = parts[parts.length - 1];
                 }
-                else{
-                    itemName = String.join(" ", Arrays.copyOfRange(parts, 1, parts.length - 1)); //itemName is between action and price
-                    priceString = parts[parts.length - 1]; //price is always last
-                }
-            }
-            else{
-                itemName = parts[parts.length - 1]; //parts has 2 elements so itemName is just last element (after action)
+            } else {
+                itemName = parts[parts.length - 1];
             }
 
             switch (action) {
@@ -144,7 +205,7 @@ public class Server {
                         try {
                             double newPrice = Double.parseDouble(priceString);
                             if (MenuUtils.itemExists(itemName)) {
-                                MenuUtils.addItem(itemName, newPrice); // Update item by adding it again
+                                MenuUtils.addItem(itemName, newPrice);
                                 out.println("ITEM_UPDATED: " + itemName);
                             } else {
                                 out.println("ERROR: Item '" + itemName + "' not found.");
@@ -162,8 +223,5 @@ public class Server {
                     break;
             }
         }
-
-
-
     }
 }

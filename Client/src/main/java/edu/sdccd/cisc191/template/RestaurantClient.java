@@ -16,11 +16,11 @@ import java.util.*;
 public class RestaurantClient extends Application {
 
     private static final String SERVER_ADDRESS = "localhost";
-    private static final int PORT = 8080;
+    private static final int PORT = 8081;
     private DialogPromt dialog;
 
     private ObservableList<String> menuItems = FXCollections.observableArrayList();
-    private List<Order> orders = new ArrayList<>(); // List to store orders
+    private List<Item> items = new ArrayList<>(); // List to store orders
     private Button adminButton = new Button("Admin Mode");
     private boolean isAdminMode = false;
     private Button refreshButton = new Button("Refresh Menu"); // New Refresh Button
@@ -54,11 +54,11 @@ public class RestaurantClient extends Application {
         menuListView.setPrefHeight(150);
 
         // Button to place an order
-        Button placeOrderButton = new Button("Place Order");
-        placeOrderButton.setOnAction(e -> {
+        Button addToOrder = new Button("Add To Order");
+        addToOrder.setOnAction(e -> {
             String selectedItem = menuListView.getSelectionModel().getSelectedItem();
             if (selectedItem != null && !isAdminMode) {
-                placeOrder(selectedItem.split(" - ")[0]); // Extract item name
+                addToOrder(selectedItem.split(" - ")[0]); // Extract item name
             } else if (isAdminMode) {
                 dialog.showAlert("Admin Mode", "You cannot place orders in Admin Mode.");
             }
@@ -68,7 +68,7 @@ public class RestaurantClient extends Application {
         removeItemButton.setOnAction(e -> {
             String selectedItem = orderListView.getSelectionModel().getSelectedItem();
             if (selectedItem != null && !isAdminMode) {
-                orders.removeIf(order -> order.getItemName().equals(selectedItem.split(" - ")[0])); // Remove item based on name
+                items.removeIf(item -> item.getItemName().equals(selectedItem.split(" - ")[0])); // Remove item based on name
                 orderListView.getItems().remove(selectedItem);
                 updateOrderListView(); // Update the display after removal
 
@@ -90,12 +90,21 @@ public class RestaurantClient extends Application {
             }
         });
 
+        Button placeOrderButton = new Button("Place Order");
+        placeOrderButton.setOnAction(e -> {
+            if (!isAdminMode) {
+                sendOrderToServer(); // Call the method to send the entire order to the server
+            } else {
+                dialog.showAlert("Admin Mode", "You cannot place orders in Admin Mode.");
+            }
+        });
+
         // Layout for buttons
-        HBox buttonBox = new HBox(10, placeOrderButton, getTotalButton, refreshButton, removeItemButton);
+        HBox buttonBox = new HBox(10, addToOrder, getTotalButton, refreshButton, removeItemButton, placeOrderButton);
         buttonBox.setPadding(new Insets(10, 0, 10, 0));
 
         // Main layout
-        VBox mainLayout = new VBox(10, titleLabel, menuListView, buttonBox, new Label("Placed Orders"), orderListView, adminButton);
+        VBox mainLayout = new VBox(10, titleLabel, menuListView, buttonBox, new Label("Order Total"), orderListView, adminButton);
         mainLayout.setPadding(new Insets(20));
 
         // Setup the scene and stage
@@ -190,7 +199,7 @@ public class RestaurantClient extends Application {
      * Placing orders, updating order view, and getting total.
      */
 
-    private void placeOrder(String itemName) {
+    private void addToOrder(String itemName) {
         // Split the input to find the item in the menu
         String[] parts = itemName.split(":");
 
@@ -212,35 +221,35 @@ public class RestaurantClient extends Application {
             out.println("ERROR: Invalid price format.");
             return; // Exit the method early
         }
-        for (Order order : orders) {
-            if (order.getItemName().equals(name)) {
+        for (Item item : items) {
+            if (item.getItemName().equals(name)) {
                 // If it exists, increase the quantity and update the order
-                order.setQuantity(order.getQuantity() + 1);
-                double totalPrice = order.getQuantity() * price;
-                order.setPrice(totalPrice);
-                out.println("PLACE_ORDER " + name + " (updated quantity)");
+                item.setQuantity(item.getQuantity() + 1);
+                double totalPrice = item.getQuantity() * price;
+                item.setPrice(totalPrice);
+                out.println("ADD_TO_ORDER " + name + " (updated quantity)");
                 updateOrderListView(); // Update the order list view after modifying an order
                 return; // Exit the method early since we're updating an existing order
             }
         }
 
         // Create an Order instance with a quantity of 1
-        Order order = new Order(name, 1, price); // Use name for the item name
-        orders.add(order); // Add the order to the list
-        out.println("PLACE_ORDER " + itemName);
+        Item item = new Item(name, 1, price); // Use name for the item name
+        items.add(item); // Add the order to the list
+        out.println("ADD_TO_ORDER " + itemName);
         updateOrderListView(); // Update the order list view after placing an order
     }
     private void updateOrderListView() {
         // Clear the current items
         orderListView.getItems().clear();
         // Add each order to the order list view
-        for (Order order : orders) {
-            orderListView.getItems().add(order.getItemName() + " - Quantity: " + order.getQuantity() + " - Price: $" + order.getTotalPrice());
+        for (Item item : items) {
+            orderListView.getItems().add(item.getItemName() + " - Quantity: " + item.getQuantity() + " - Price: $" + item.getTotalPrice());
         }
     }
 
     private void getOrderTotal() throws IOException {
-        double total = orders.stream().mapToDouble(Order::getTotalPrice).sum(); // Use streams to calculate total
+        double total = items.stream().mapToDouble(Item::getTotalPrice).sum(); // Use streams to calculate total
         String formattedTotal = String.format("%.2f", total);
         dialog.showAlert("Total Order Cost", "Total Order Cost: $" + formattedTotal);
     }
@@ -271,5 +280,38 @@ public class RestaurantClient extends Application {
         // Check if the entered password is correct
         return "admin".equals(password); // Hardcoded password for demonstration
     }
+
+    private void sendOrderToServer() {
+        if (items.isEmpty()) {
+            dialog.showAlert("Empty Order", "Please add items to your order before placing it.");
+            return;
+        }
+        TextInputDialog nameDialog = new TextInputDialog();
+        nameDialog.setTitle("Customer Name");
+        nameDialog.setHeaderText("Enter your name:");
+        nameDialog.setContentText("Name:");
+
+        Optional<String> result = nameDialog.showAndWait();
+        String customerName = result.orElse("Unknown");
+
+        // Convert the list of items to a string format
+        StringBuilder orderDetails = new StringBuilder(customerName);
+        for (Item item : items) {
+            orderDetails.append(",").append(item.getItemName())
+                    .append(":").append(item.getQuantity())
+                    .append(":").append(item.getTotalPrice());
+        }
+
+
+        // Send the PLACE_ORDER command
+        out.println("PLACE_ORDER");
+        // Send the order details as a string
+        out.println(orderDetails.toString());
+
+        // Flush the output stream to ensure the data is sent
+        out.flush();
+
+    }
+
 
 }
