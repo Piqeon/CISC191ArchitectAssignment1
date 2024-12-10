@@ -10,8 +10,8 @@ mvn clean install
 java -jar Server/target/Server-1.0.0.jar  
 java -jar Client/target/Client-1.0.0.jar
 ## Common Module
-Shared classes between client and server modules.
+Shared classes between restaurantClient and server modules.
 ## Server Module
 The server application that handles multiple clients.
 ## Client Module
-The client application used to connect to the server.
+The restaurantClient application used to connect to the server.

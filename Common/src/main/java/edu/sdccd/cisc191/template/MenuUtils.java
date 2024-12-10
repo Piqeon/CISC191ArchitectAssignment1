@@ -69,7 +69,13 @@ public class MenuUtils {
         }
     }
 
-    public static Map<String, Double> getAllItems() {   //Returns the menuItems map
-        return menuItems;
+    public static Map<String, Double> getAllItems() {
+        Map<String, Double> sortedMenu = new LinkedHashMap<>();
+        menuItems.entrySet()
+                .stream()
+                .sorted((entry1, entry2) -> entry1.getKey().compareToIgnoreCase(entry2.getKey()))  // Case-insensitive sorting
+                .forEach(entry -> sortedMenu.put(entry.getKey(), entry.getValue()));  // Insert sorted entries into new map
+        return sortedMenu;
     }
+
 }

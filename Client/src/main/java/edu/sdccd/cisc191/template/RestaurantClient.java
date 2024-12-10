@@ -20,13 +20,14 @@ public class RestaurantClient extends Application {
     private DialogPromt dialog;
 
     private ObservableList<String> menuItems = FXCollections.observableArrayList();
-    private List<Item> items = new ArrayList<>(); // List to store orders
+    private List<Item> items = new LinkedList<>(); // List to store orders
     private Button adminButton = new Button("Admin Mode");
     private boolean isAdminMode = false;
     private Button refreshButton = new Button("Refresh Menu"); // New Refresh Button
 
     private Socket socket;
     private BufferedReader in;
+    private DatabaseSearching databaseSearching;
     private PrintWriter out;
     private AdminController adminController;
     private ListView<String> orderListView = new ListView<>(FXCollections.observableArrayList());
@@ -37,6 +38,7 @@ public class RestaurantClient extends Application {
         // Initialize connection to the server
         initializeConnection();
         adminController = new AdminController(out, this);
+        databaseSearching = new DatabaseSearching(in, out);
 
         // Fetch the menu items from the server
         fetchMenuItems();
@@ -98,9 +100,17 @@ public class RestaurantClient extends Application {
                 dialog.showAlert("Admin Mode", "You cannot place orders in Admin Mode.");
             }
         });
+        Button SearchButton = new Button("Search");
+        SearchButton.setOnAction(e -> {
+            if (!isAdminMode) {
+                searchPastOrder(); // Call the method to send the entire order to the server
+            } else {
+                dialog.showAlert("Admin Mode", "You cannot place orders in Admin Mode.");
+            }
+        });
 
         // Layout for buttons
-        HBox buttonBox = new HBox(10, addToOrder, getTotalButton, refreshButton, removeItemButton, placeOrderButton);
+        HBox buttonBox = new HBox(10, addToOrder, getTotalButton, refreshButton, removeItemButton, placeOrderButton, SearchButton);
         buttonBox.setPadding(new Insets(10, 0, 10, 0));
 
         // Main layout
@@ -108,8 +118,8 @@ public class RestaurantClient extends Application {
         mainLayout.setPadding(new Insets(20));
 
         // Setup the scene and stage
-        Scene scene = new Scene(mainLayout, 500, 400);
-        primaryStage.setTitle("Restaurant Menu - Client");
+        Scene scene = new Scene(mainLayout, 650,400);
+        primaryStage.setTitle("Restaurant Menu - RestaurantClient");
         primaryStage.setScene(scene);
         primaryStage.show();
 
@@ -223,7 +233,7 @@ public class RestaurantClient extends Application {
         }
         for (Item item : items) {
             if (item.getItemName().equals(name)) {
-                // If it exists, increase the quantity and update the order
+                // If it exists, increase the quantity and update the item
                 item.setQuantity(item.getQuantity() + 1);
                 double totalPrice = item.getQuantity() * price;
                 item.setPrice(totalPrice);
@@ -235,14 +245,14 @@ public class RestaurantClient extends Application {
 
         // Create an Order instance with a quantity of 1
         Item item = new Item(name, 1, price); // Use name for the item name
-        items.add(item); // Add the order to the list
+        items.add(item); // Add the item to the list
         out.println("ADD_TO_ORDER " + itemName);
         updateOrderListView(); // Update the order list view after placing an order
     }
     private void updateOrderListView() {
         // Clear the current items
         orderListView.getItems().clear();
-        // Add each order to the order list view
+        // Add each item to the item list view
         for (Item item : items) {
             orderListView.getItems().add(item.getItemName() + " - Quantity: " + item.getQuantity() + " - Price: $" + item.getTotalPrice());
         }
@@ -311,6 +321,48 @@ public class RestaurantClient extends Application {
         // Flush the output stream to ensure the data is sent
         out.flush();
 
+        String response = readServerResponse();
+        if (response.startsWith("ORDER_PLACED")){
+            dialog.showAlert("Sucess! ","Order Placed with server.");
+            items.clear();
+            updateOrderListView();
+        }
+        else {
+            dialog.showAlert("ERROR", "Order failed to place! ");
+        }
+
+    }
+
+    private void searchPastOrder() {
+        System.out.println("Searching for order...");
+        TextInputDialog nameDialog = new TextInputDialog();
+        nameDialog.setTitle("Customer Lookup");
+        nameDialog.setHeaderText("Enter name:");
+        nameDialog.setContentText("Name:");
+
+        Optional<String> result = nameDialog.showAndWait();
+
+        if (result.isPresent()) {
+            String name = result.get();
+            try {
+                // Use DatabaseSearching to search for orders by customer name
+                String response = databaseSearching.searchOrderByCustomerName(name);
+                System.out.println(response);
+
+                if (response.startsWith("NOT_FOUND")) {
+                    dialog.showAlert("Search Result", "No orders found for: " + name);
+                } else if (response.startsWith("FOUND")) {
+                    dialog.showAlert("Orders Found", response);
+                } else {
+                    dialog.showAlert("Error", "Error occurred while searching for orders.");
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+                dialog.showAlert("Error", "Error occurred while trying to search database. ");
+            }
+        } else {
+            dialog.showAlert("Input Error", "Please enter a name to search.");
+        }
     }
 
 

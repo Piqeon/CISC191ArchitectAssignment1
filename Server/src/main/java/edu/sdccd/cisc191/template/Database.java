@@ -1,7 +1,9 @@
-import edu.sdccd.cisc191.template.Order;
-import edu.sdccd.cisc191.template.PastOrderRepository;
+package edu.sdccd.cisc191.template;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 @Service
 public class Database {
@@ -23,6 +25,21 @@ public class Database {
         } catch (Exception e) {
             System.out.println("ERROR: Failed to save order.");
             e.printStackTrace();
+        }
+    }
+    public List<Order> findOrdersByCustomerName(String customerName) {
+        try {
+            List<Order> orders = repository.findByCustomerName(customerName);
+            if (orders.isEmpty()) {
+                System.out.println("No orders found for customer: " + customerName);
+            } else {
+                System.out.println("Found " + orders.size() + " order(s) for customer: " + customerName);
+            }
+            return orders;
+        } catch (Exception e) {
+            System.out.println("ERROR: Failed to search orders by customer name.");
+            e.printStackTrace();
+            return null;
         }
     }
 }

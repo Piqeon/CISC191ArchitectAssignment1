@@ -8,12 +8,12 @@ import java.util.*;
 import javafx.application.Platform;
 public class AdminController {
     private PrintWriter out; // Print writer to send commands to Server
-    private RestaurantClient client; // Client call to interact with client
+    private RestaurantClient restaurantClient; // RestaurantClient call to interact with restaurantClient
     private String response;
 
-    public AdminController(PrintWriter out, RestaurantClient client) {
+    public AdminController(PrintWriter out, RestaurantClient restaurantClient) {
         this.out = out;
-        this.client = client;
+        this.restaurantClient = restaurantClient;
     }
 
     public void showAdminFeatures() {
@@ -25,7 +25,7 @@ public class AdminController {
         Button addButton = createButton("Add Item", e -> showAddItemDialog()); // Add item button (showAddItemDialog method)
         Button removeButton = createButton("Remove Item", e -> showRemoveItemDialog()); // Remove item button (showRemoveItemDialog method)
         Button updateButton = createButton("Update Item", e -> showUpdateItemDialog()); // Update item button (showUpdateItemDialog method)
-        Button refreshButton = createButton("Refresh Menu", e -> client.refreshMenuItems()); // Refresh button calls client method refreshMenuItems()
+        Button refreshButton = createButton("Refresh Menu", e -> restaurantClient.refreshMenuItems()); // Refresh button calls restaurantClient method refreshMenuItems()
 
         // Set up actions for buttons
         removeButton.setOnAction(e -> showRemoveItemDialog()); // RemoveButton action (showRemoveItemDialog method)
@@ -67,7 +67,7 @@ public class AdminController {
                     out.println("ADMIN_MODE ADD " + itemName + " " + itemPrice);
 
                     // Listen for the response from the server
-                    String response = client.readServerResponse();
+                    String response = restaurantClient.readServerResponse();
 
                     // Update the UI based on the server response
                     Platform.runLater(() -> { // Change: Wraps this code in Platform.runLater
@@ -98,7 +98,7 @@ public class AdminController {
                         out.println("ADMIN_MODE REMOVE " + itemName);
 
                         // Listen for the response from the server (this might block)
-                        response = client.readServerResponse();
+                        response = restaurantClient.readServerResponse();
 
                         // Once we get the response, update the UI on the JavaFX Application Thread
                         Platform.runLater(() -> { // Change: Wraps this code in Platform.runLater
@@ -129,7 +129,7 @@ public class AdminController {
 
                 // Send the update command to the server
                 out.println("ADMIN_MODE UPDATE " + itemName + " " + itemPrice);
-                response = client.readServerResponse();
+                response = restaurantClient.readServerResponse();
 
                 Platform.runLater(() -> { // Change: Wraps this code in Platform.runLater
                     if (response.startsWith("ITEM_UPDATED")) {
@@ -154,7 +154,7 @@ public class AdminController {
         String response;
         List<String> menuItems = new ArrayList<>();
 
-        while (!(response = client.readServerResponse()).equals("MENU_END")) {
+        while (!(response = restaurantClient.readServerResponse()).equals("MENU_END")) {
             if (!response.equals("MENU_START")) {
                 menuItems.add(response);
             }

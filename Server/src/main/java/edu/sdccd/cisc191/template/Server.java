@@ -1,11 +1,9 @@
-import edu.sdccd.cisc191.template.MenuUtils;
-import edu.sdccd.cisc191.template.Item;
-import edu.sdccd.cisc191.template.Order;
+package edu.sdccd.cisc191.template;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.stereotype.Component;
 
 import java.net.*;
 import java.io.*;
@@ -22,11 +20,12 @@ public class Server implements CommandLineRunner {
     private static final int PORT = 8081;
     private static ExecutorService pool = Executors.newFixedThreadPool(10);
 
-    private final Database database; // Dependency injected by Spring
+    private final Database database;
 
     public static void main(String[] args) {
-        SpringApplication.run(Server.class, args); // Start Spring Boot application
+        SpringApplication.run(Server.class, args);
     }
+
     @Autowired
     public Server(Database database) {
         this.database = database;
@@ -34,7 +33,7 @@ public class Server implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        startServer();  // Start the server once Spring Boot has initialized
+        startServer();
     }
 
     public void startServer() {
@@ -69,7 +68,7 @@ public class Server implements CommandLineRunner {
         }
     }
 
-    private class ClientHandler implements Runnable {
+    public class ClientHandler implements Runnable {
         private Socket clientSocket;
         private BufferedReader in;
         private PrintWriter out;
@@ -93,6 +92,8 @@ public class Server implements CommandLineRunner {
                         handleAdminMode(command);
                     } else if (request.startsWith("PLACE_ORDER")) {
                         handleOrder();
+                    } else if (request.startsWith("SEARCH_NAME")) {
+                        orderNameSearching();
                     }
                 }
             } catch (IOException e) {
@@ -106,13 +107,41 @@ public class Server implements CommandLineRunner {
             }
         }
 
-        private void sendMenu() {
+        public void sendMenu() {
             out.println("MENU_START");
             for (Map.Entry<String, Double> item : MenuUtils.getAllItems().entrySet()) {
                 out.println(item.getKey() + ":" + item.getValue());
             }
             out.println("MENU_END");
         }
+
+        public void orderNameSearching() {
+            try {
+                String name = in.readLine();
+                if (name == null || name.trim().isEmpty()) {
+                    out.println("ERROR: Customer name cannot be empty.");
+                    return;
+                }
+
+                List<Order> orders = database.findOrdersByCustomerName(name);
+
+                if (orders == null || orders.isEmpty()) {
+                    out.println("No orders found.");
+                } else {
+                    // Send each order's details directly
+                    for (Order order : orders) {
+                        // Construct order data string in a simple format
+                        String orderData = order.getId() + "," + order.getCustomerName() + ","
+                                + order.getItems() + "," + order.getTotalPrice();
+                        out.println(orderData);  // Send the order details to the client
+                    }
+                }
+            } catch (IOException e) {
+                out.println("ERROR: Failed to read input or search orders.");
+                e.printStackTrace();
+            }
+        }
+
 
         private void handleOrder() {
             try {
@@ -123,7 +152,6 @@ public class Server implements CommandLineRunner {
                         out.println("ERROR: Failed to parse order details.");
                         return;
                     }
-                    // Now you can safely call saveOrder on the database
                     database.saveOrder(newOrder);
                     out.println("ORDER_PLACED: " + newOrder.getId());
                 }
@@ -155,7 +183,7 @@ public class Server implements CommandLineRunner {
             return items;
         }
 
-        private void handleAdminMode(String command) {
+        public void handleAdminMode(String command) {
             String[] parts = command.split(" ");
             String action = parts[0];
             String itemName = null;
